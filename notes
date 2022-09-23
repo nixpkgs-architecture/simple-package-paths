@@ -1,0 +1,3 @@
+Create a tool that can rename Nix files, with the ability to:
+- Also rename all references to that file
+- Install a symlink in the old place

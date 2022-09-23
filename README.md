@@ -120,3 +120,9 @@ This RFC makes no requirement as to how the transition should happen, but here a
 [future]: #future-work
 
 - This RFC only addresses the top-level attribute namespace, aka packages in `pkgs.<name>`, it doesn't do anything about package sets like `pkgs.python3Packages.<name>`, `pkgs.haskell.packages.ghc942.<name>`, which could also benefit from a similar auto-calling
+- While this RFC doesn't address expressions where the second `callPackage` argument isn't `{}`, there is an easy way to transition to an argument of `{}`: For every attribute of the form `name = attrs.value;` in the argument, make sure `attrs` is in the arguments of the file, then add `name ? attrs.value` to the arguments. Then the expression in `all-packages.nix` can too be auto-called
+  - Don't do this for `name = value` pairs though, that's an alias-like thing
+- What to do with different versions, e.g. `wlroots = wlroots_0_14`? This goes into version resolution, a different problem to fix
+- What to do about e.g. `libsForQt5.callPackage`? This goes into overrides, a different problem to fix
+- What about aliases like `jami-daemon = jami.jami-daemon`?
+- What about `recurseIntoAttrs`? Not single packages, package sets, another problem
