@@ -116,6 +116,16 @@ This RFC makes no requirement as to how the transition should happen, but here a
   ```
   The main downside of this is the increased complexity of implementation
 
+ - Use `package.nix` instead of `package-function.nix`
+   - Makes the migration to a non-function form of overridable packages harder in the future. We'd like to use `package.nix` for a package format that's based on a fixpoint rather than a function, because that will make overriding simpler.
+
+ - Use `default.nix` instead of `package-function.nix`
+   - `default.nix`'s only benefits do not apply
+     - removing the need to specify the file name in expressions, but this does not apply because we have to do this at most once in the code that replaces definitions from `all-packages.nix`.
+     - removing the need to specify the file name on the command line, but this does not apply because a package function must be imported into an expression before it can be used, making `nix build -f pkg/hello` equally broken regardless of file name.
+   - Choosing `default.nix` would bias the purpose of the `pkg` directory to serve only as package definitions, whereas we could make the tree more human friendly by grouping files together by "topic" rather than by technical delineations. For instance, having a package definition, changelog, package-specific config generator and perhaps even NixOS module in one directory makes work on the package in a broad sense easier. This is not a goal of this RFC, but a motivation to make this a future possibility.
+
+
 # Unresolved questions
 [unresolved]: #unresolved-questions
 
