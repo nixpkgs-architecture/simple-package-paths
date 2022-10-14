@@ -55,7 +55,7 @@ However, if such definitions can be refactored into the above form they will bec
 ## Backwards compatibility symlinks
 [symlinks]: #backwards-compatibility-symlinks
 
-When moving `pkgs/some/dir/default.nix` to the new `pkg/<name>/package.nix`, a symlink will be created pointing from `pkg/some/dir/default.nix` to `pkg/<name>/package.nix`. Reasoning:
+When moving `pkgs/some/dir/default.nix` to the new `pkg/<name>/package-function.nix`, a symlink will be created pointing from `pkg/some/dir/default.nix` to `pkg/<name>/package-function.nix`. Reasoning:
 - Current community discussions referencing old files from the `master` branch are still valid for some time. While GitHub doesn't provide an easy way to navigate to a symlink, seeing the path to where the file has moved is better than getting an error.
 - It provides an opportunity for code referencing old paths to be updated. While it's not possible to give a deprecation warning with symlinks, users will at least be able to read it in the NixOS release notes. This doesn't occur often in practice.
 
@@ -72,7 +72,7 @@ This RFC makes no requirement as to how the transition should happen, but here a
 [examples]: #examples
 
 - `pkgs.hello`:
-  - Move from `pkgs/applications/misc/hello/default.nix` to `pkg/hello/package.nix`
+  - Move from `pkgs/applications/misc/hello/default.nix` to `pkg/hello/package-function.nix`
   - Move from `pkgs/applications/misc/hello/test.nix` to `pkg/hello/test.nix`
 - `pkgs.gnumake`: Move from `pkgs/development/tools/build-managers/gnumake` to `pkg/gnumake`
 - `pkgs.gnumake42`: Move from `pkgs/development/tools/build-managers/gnumake/4.2` to `pkg/gnumake42`
