@@ -55,7 +55,7 @@ However, if such definitions can be refactored into the above form they will bec
 ## Backwards compatibility symlinks
 [symlinks]: #backwards-compatibility-symlinks
 
-When moving `pkgs/some/dir` to the new `pkgs/auto/<name>`, a symlink will be created pointing from `pkgs/some/dir` to `pkgs/auto/<name>`. Reasoning:
+When moving `pkgs/some/dir/default.nix` to the new `pkg/<name>/package.nix`, a symlink will be created pointing from `pkg/some/dir/default.nix` to `pkg/<name>/package.nix`. Reasoning:
 - Current community discussions referencing old files from the `master` branch are still valid for some time. While GitHub doesn't provide an easy way to navigate to a symlink, seeing the path to where the file has moved is better than getting an error.
 - It provides an opportunity for code referencing old paths to be updated. While it's not possible to give a deprecation warning with symlinks, users will at least be able to read it in the NixOS release notes. This doesn't occur often in practice.
 
@@ -71,11 +71,13 @@ This RFC makes no requirement as to how the transition should happen, but here a
 # Examples
 [examples]: #examples
 
-- `pkgs.hello`: Move from `pkgs/applications/misc/hello` to `pkgs/auto/hello`
-- `pkgs.gnumake`: Move from `pkgs/development/tools/build-managers/gnumake` to `pkgs/auto/gnumake`
-- `pkgs.gnumake42`: Move from `pkgs/development/tools/build-managers/gnumake/4.2` to `pkgs/auto/gnumake42`
-- `pkgs.buildEnv`: Move from `pkgs/build-support/buildenv` to `pkgs/auto/buildEnv`
-- `pkgs.fetchFromGitHub`: Move from `pkgs/build-support/fetchgithub` to `pkgs/auto/fetchFromGitHub`
+- `pkgs.hello`:
+  - Move from `pkgs/applications/misc/hello/default.nix` to `pkg/hello/package.nix`
+  - Move from `pkgs/applications/misc/hello/test.nix` to `pkg/hello/test.nix`
+- `pkgs.gnumake`: Move from `pkgs/development/tools/build-managers/gnumake` to `pkg/gnumake`
+- `pkgs.gnumake42`: Move from `pkgs/development/tools/build-managers/gnumake/4.2` to `pkg/gnumake42`
+- `pkgs.buildEnv`: Move from `pkgs/build-support/buildenv` to `pkg/buildEnv`
+- `pkgs.fetchFromGitHub`: Move from `pkgs/build-support/fetchgithub` to `pkg/fetchFromGitHub`
 
 # Interactions
 [interactions]: #interactions
@@ -102,15 +104,15 @@ This RFC makes no requirement as to how the transition should happen, but here a
 # Alternatives
 [alternatives]: #alternatives
 
-- Create a prefix-based hierarchy of directories, e.g. `pkgs/auto/he/hello`, similar to `.git/objects`, so that no directory has more than 1000 entries, enabling GitHub to display the entries, therefore improving navigation on GitHub. Downsides are:
+- Create a prefix-based hierarchy of directories, e.g. `pkg/he/hello`, similar to `.git/objects`, so that no directory has more than 1000 entries, enabling GitHub to display the entries, therefore improving navigation on GitHub. Downsides are:
   - Slower evaluation, since a lot more directories need to be traversed
   - Increased end-user complexity:
     - Creating the package files often requires the creating of 2 directories, not just one
     - Referencing the files requires knowing the prefix schema
 - Improve deprecation signalling by creating `.nix` files that act like a symlink, but with a warning. Something like this:
   ```nix
-  builtins.trace "warning: Using deprecated path ${./.}, use pkgs/auto/<name> instead, this will be removed after NixOS 22.05"
-    (import ../../pkgs/auto/name)
+  builtins.trace "warning: Using deprecated path ${./.}, use pkg/<name> instead, this will be removed after NixOS 22.05"
+    (import ../../pkg/name)
   ```
   The main downside of this is the increased complexity of implementation
 
