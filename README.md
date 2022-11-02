@@ -87,6 +87,8 @@ This RFC makes no requirement as to how the transition should happen, but here a
 
 - The existing categorization of packages gets lost. Counter-arguments:
   - It was never that useful to begin with
+    - The categorization was always incomplete, because packages defined in the language package sets often don't get their own categorized file path.
+    - It was an inconvenient user interface, requiring a checkout or browsing through GitHub
   - There's other better ways of discovering similar packages, e.g. [Repology](https://repology.org/)
 - GitHub's UI can't display more than 1000 items in a directory. Counter-arguments:
   - It's still possible to open a subdirectory using the "Go to file" button, or pressing the `T` key
