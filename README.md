@@ -55,7 +55,7 @@ However, if such definitions can be refactored into the above form they will bec
 ## Backwards compatibility symlinks
 [symlinks]: #backwards-compatibility-symlinks
 
-When moving `pkgs/some/dir/default.nix` to the new `pkg/<name>/package-function.nix`, a symlink will be created pointing from `pkg/some/dir/default.nix` to `pkg/<name>/package-function.nix`. Reasoning:
+When moving `pkgs/some/dir/default.nix` to the new `pkg/<name>/pkg-fun.nix`, a symlink will be created pointing from `pkg/some/dir/default.nix` to `pkg/<name>/pkg-fun.nix`. Reasoning:
 - Current community discussions referencing old files from the `master` branch are still valid for some time. While GitHub doesn't provide an easy way to navigate to a symlink, seeing the path to where the file has moved is better than getting an error.
 - It provides an opportunity for code referencing old paths to be updated. While it's not possible to give a deprecation warning with symlinks, users will at least be able to read it in the NixOS release notes. This doesn't occur often in practice.
 
@@ -72,7 +72,7 @@ This RFC makes no requirement as to how the transition should happen, but here a
 [examples]: #examples
 
 - `pkgs.hello`:
-  - Move from `pkgs/applications/misc/hello/default.nix` to `pkg/hello/package-function.nix`
+  - Move from `pkgs/applications/misc/hello/default.nix` to `pkg/hello/pkg-fun.nix`
   - Move from `pkgs/applications/misc/hello/test.nix` to `pkg/hello/test.nix`
 - `pkgs.gnumake`: Move from `pkgs/development/tools/build-managers/gnumake` to `pkg/gnumake`
 - `pkgs.gnumake42`: Move from `pkgs/development/tools/build-managers/gnumake/4.2` to `pkg/gnumake42`
@@ -116,10 +116,10 @@ This RFC makes no requirement as to how the transition should happen, but here a
   ```
   The main downside of this is the increased complexity of implementation
 
- - Use `package.nix` instead of `package-function.nix`
+ - Use `package.nix` instead of `pkg-fun.nix`
    - Makes the migration to a non-function form of overridable packages harder in the future. We'd like to use `package.nix` for a package format that's based on a fixpoint rather than a function, because that will make overriding simpler.
 
- - Use `default.nix` instead of `package-function.nix`
+ - Use `default.nix` instead of `pkg-fun.nix`
    - `default.nix`'s only benefits do not apply
      - removing the need to specify the file name in expressions, but this does not apply because we have to do this at most once in the code that replaces definitions from `all-packages.nix`.
      - removing the need to specify the file name on the command line, but this does not apply because a package function must be imported into an expression before it can be used, making `nix build -f pkg/hello` equally broken regardless of file name.
