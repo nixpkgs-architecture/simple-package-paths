@@ -125,6 +125,10 @@ This RFC makes no requirement as to how the transition should happen, but here a
      - removing the need to specify the file name on the command line, but this does not apply because a package function must be imported into an expression before it can be used, making `nix build -f pkgs/unit/hello` equally broken regardless of file name.
    - Choosing `default.nix` would bias the purpose of the `pkg` directory to serve only as package definitions, whereas we could make the tree more human friendly by grouping files together by "topic" rather than by technical delineations. For instance, having a package definition, changelog, package-specific config generator and perhaps even NixOS module in one directory makes work on the package in a broad sense easier. This is not a goal of this RFC, but a motivation to make this a future possibility.
 
+ - Use `unit/` instead of `pkgs/unit`. This is future proof in case we want to
+   make the directory structure more general purpose, but this is out of scope
+   and we want to improve tooling to make renames easy.
+
 
 # Unresolved questions
 [unresolved]: #unresolved-questions
