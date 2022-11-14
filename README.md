@@ -55,7 +55,7 @@ However, if such definitions can be refactored into the above form they will bec
 ## Backwards compatibility symlinks
 [symlinks]: #backwards-compatibility-symlinks
 
-When moving `pkgs/some/dir/default.nix` to the new `pkg/<name>/pkg-fun.nix`, a symlink will be created pointing from `pkg/some/dir/default.nix` to `pkg/<name>/pkg-fun.nix`. Reasoning:
+When moving `pkgs/some/dir/default.nix` to the new `pkgs/unit/<name>/pkg-fun.nix`, a symlink will be created pointing from `pkgs/unit/some/dir/default.nix` to `pkgs/unit/<name>/pkg-fun.nix`. Reasoning:
 - Current community discussions referencing old files from the `master` branch are still valid for some time. While GitHub doesn't provide an easy way to navigate to a symlink, seeing the path to where the file has moved is better than getting an error.
 - It provides an opportunity for code referencing old paths to be updated. While it's not possible to give a deprecation warning with symlinks, users will at least be able to read it in the NixOS release notes. This doesn't occur often in practice.
 
@@ -72,12 +72,12 @@ This RFC makes no requirement as to how the transition should happen, but here a
 [examples]: #examples
 
 - `pkgs.hello`:
-  - Move from `pkgs/applications/misc/hello/default.nix` to `pkg/hello/pkg-fun.nix`
-  - Move from `pkgs/applications/misc/hello/test.nix` to `pkg/hello/test.nix`
-- `pkgs.gnumake`: Move from `pkgs/development/tools/build-managers/gnumake` to `pkg/gnumake`
-- `pkgs.gnumake42`: Move from `pkgs/development/tools/build-managers/gnumake/4.2` to `pkg/gnumake42`
-- `pkgs.buildEnv`: Move from `pkgs/build-support/buildenv` to `pkg/buildEnv`
-- `pkgs.fetchFromGitHub`: Move from `pkgs/build-support/fetchgithub` to `pkg/fetchFromGitHub`
+  - Move from `pkgs/applications/misc/hello/default.nix` to `pkgs/unit/hello/pkg-fun.nix`
+  - Move from `pkgs/applications/misc/hello/test.nix` to `pkgs/unit/hello/test.nix`
+- `pkgs.gnumake`: Move from `pkgs/development/tools/build-managers/gnumake` to `pkgs/unit/gnumake`
+- `pkgs.gnumake42`: Move from `pkgs/development/tools/build-managers/gnumake/4.2` to `pkgs/unit/gnumake42`
+- `pkgs.buildEnv`: Move from `pkgs/build-support/buildenv` to `pkgs/unit/buildEnv`
+- `pkgs.fetchFromGitHub`: Move from `pkgs/build-support/fetchgithub` to `pkgs/unit/fetchFromGitHub`
 
 # Interactions
 [interactions]: #interactions
@@ -104,15 +104,15 @@ This RFC makes no requirement as to how the transition should happen, but here a
 # Alternatives
 [alternatives]: #alternatives
 
-- Create a prefix-based hierarchy of directories, e.g. `pkg/he/hello`, similar to `.git/objects`, so that no directory has more than 1000 entries, enabling GitHub to display the entries, therefore improving navigation on GitHub. Downsides are:
+- Create a prefix-based hierarchy of directories, e.g. `pkgs/unit/he/hello`, similar to `.git/objects`, so that no directory has more than 1000 entries, enabling GitHub to display the entries, therefore improving navigation on GitHub. Downsides are:
   - Slower evaluation, since a lot more directories need to be traversed
   - Increased end-user complexity:
     - Creating the package files often requires the creating of 2 directories, not just one
     - Referencing the files requires knowing the prefix schema
 - Improve deprecation signalling by creating `.nix` files that act like a symlink, but with a warning. Something like this:
   ```nix
-  builtins.trace "warning: Using deprecated path ${./.}, use pkg/<name> instead, this will be removed after NixOS 22.05"
-    (import ../../pkg/name)
+  builtins.trace "warning: Using deprecated path ${./.}, use pkgs/unit/<name> instead, this will be removed after NixOS 22.05"
+    (import ../../pkgs/unit/name)
   ```
   The main downside of this is the increased complexity of implementation
 
@@ -122,7 +122,7 @@ This RFC makes no requirement as to how the transition should happen, but here a
  - Use `default.nix` instead of `pkg-fun.nix`
    - `default.nix`'s only benefits do not apply
      - removing the need to specify the file name in expressions, but this does not apply because we have to do this at most once in the code that replaces definitions from `all-packages.nix`.
-     - removing the need to specify the file name on the command line, but this does not apply because a package function must be imported into an expression before it can be used, making `nix build -f pkg/hello` equally broken regardless of file name.
+     - removing the need to specify the file name on the command line, but this does not apply because a package function must be imported into an expression before it can be used, making `nix build -f pkgs/unit/hello` equally broken regardless of file name.
    - Choosing `default.nix` would bias the purpose of the `pkg` directory to serve only as package definitions, whereas we could make the tree more human friendly by grouping files together by "topic" rather than by technical delineations. For instance, having a package definition, changelog, package-specific config generator and perhaps even NixOS module in one directory makes work on the package in a broad sense easier. This is not a goal of this RFC, but a motivation to make this a future possibility.
 
 
