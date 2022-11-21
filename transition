@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+cd "$1"
+
+mkdir -p pkgs/auto
+
+cd pkgs/top-level
+rg -n '^  ([^ =]*) *= *callPackage *([^ ]*/[^ ]*) *\{ *\} *;' all-packages.nix -or '$1:$2' \
+  | while IFS=: read line attr file; do
+    slashes=$(realpath "$file" | tr -dc '/' | wc -c)
+    # Sorting by number of slashes in the path means a depth-first traversal
+    # This is needed so that we don't e.g. remove the pkgs/shells/zsh directory (whose `default.nix` the `zsh` attribute is declared as) before moving e.g. pkgs/shells/zsh/zsh-completions
+    echo "$slashes $line $attr $file"
+  done \
+  | sort -k1 -r -n \
+  | while read slashes line attr file; do
+    if [[ -f "$file" ]]; then
+      mkdir ../auto/"$attr"
+      mv "$file" ../auto/"$attr"/default.nix
+    else
+      mv "$file" ../auto/"$attr"
+    fi
+    echo "$line"
+  done \
+  | sort -n -r \
+  | while read line; do
+    sed -i "${line}d" all-packages.nix
+  done
+
+# Remove consecutive newlines, hacky :3
+for i in $(seq 10); do
+  sed -i -z 's/\n\n\n/\n\n/g' all-packages.nix
+done
+
+cd ../..
+
+while read from to; do
+  mv -v "$from" "$to"
+done < <(cat "$SCRIPT_DIR/extra-renames")
+
+curl https://github.com/nixpkgs-architecture/nixpkgs/commit/8c3df467d8b89094cef0c706f9f0c96066e61207.patch \
+  | git apply

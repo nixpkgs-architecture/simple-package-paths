@@ -1,0 +1,8 @@
+pkgs/development/tools/misc/automake pkgs/auto/automake
+pkgs/development/libraries/isl pkgs/auto/isl
+pkgs/development/libraries/readline pkgs/auto/readline
+pkgs/development/interpreters/tcl pkgs/auto/tcl
+pkgs/development/tools/misc/texinfo pkgs/auto/texinfo
+pkgs/development/libraries/gmp pkgs/auto/gmp
+pkgs/development/libraries/db pkgs/auto/db
+pkgs/build-support/setup-hooks/install-shell-files.sh pkgs/auto/installShellFiles/install-shell-files.sh
