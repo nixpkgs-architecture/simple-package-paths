@@ -1,5 +1,5 @@
 ---
-feature: auto-called-packages
+feature: simple-package-paths
 start-date: 2022-09-02
 author: Silvan Mosberger
 co-authors: (find a buddy later to help out with the RFC)
