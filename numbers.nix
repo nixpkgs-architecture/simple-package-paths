@@ -36,6 +36,23 @@ let
         null (lib.mapAttrsToList lib.nameValuePair filesToAttrs);
     in builtins.trace "Which files define which attributes:" printed;
 
+  attrLengthDistr = set:
+    let
+      names = lib.attrNames set;
+      maximumLength = lib.foldl' (acc: el: lib.max acc (lib.stringLength el)) 0 names;
+      countByLength = lib.mapAttrs (name: values: lib.length values) (lib.groupBy (name: toString (lib.stringLength name)) names);
+      lengthGroupedList = map (length: { length = length; count = countByLength.${toString length} or 0; }) (lib.range 0 maximumLength);
+      totalCount = lib.length names;
+      message = value: length:
+        let normalised = toString (100.0 * value / totalCount);
+        in builtins.trace "${normalised}% of attribute names are at most ${toString length} characters long" value;
+      cumulative = lib.foldl' (acc: el: message (acc + el.count) el.length) 0 lengthGroupedList;
+      result =
+        if set == {} then builtins.trace "(attribute set is empty)" null
+        else builtins.seq cumulative null;
+    in builtins.trace "The cumulative distribution of attribute name lengths:" result;
+
 in {
   attrsByFile = attrsByFile pkgs;
+  attrLengthDistr = attrLengthDistr pkgs;
 }
