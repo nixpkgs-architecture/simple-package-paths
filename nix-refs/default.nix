@@ -14,4 +14,12 @@ let
     src = pkgs.lib.cleanSource ./.;
     cargoLock.lockFile = ./Cargo.lock;
   };
-in result
+in result // {
+  shell = pkgs.mkShell {
+    nativeBuildInputs = [
+      pkgs.cargo
+      pkgs.rust-analyzer
+      pkgs.rustc
+    ];
+  };
+}
