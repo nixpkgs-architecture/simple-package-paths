@@ -29,13 +29,16 @@ This makes it much easier to contribute new packages packages, since there's no 
     - On GitHub this is even more problematic, as the `all-packages.nix` file is [too big to be displayed by GitHub](https://github.com/NixOS/nixpkgs/blob/nixos-22.05/pkgs/top-level/all-packages.nix)
   - Then go to that file's definition, which takes quite some time for navigation (unless you have a plugin that can jump to it directly)
     - It also slows down or even deadlocks editors due to the file size
-  - In some cases `nix edit` works, though that's not yet stable (it relies on Flakes being enabled) and comes with some problems ([doesn't allow the file to be edited](https://github.com/NixOS/nix/issues/3347), doesn't work with packages that don't set `meta.position` correctly).
+  - In some cases `nix edit` works, though that's not yet stable (it relies on Flakes being enabled) and comes with some problems ([doesn't yet open a writable file](https://github.com/NixOS/nix/issues/3347), doesn't work with packages that don't set `meta.position` correctly).
 - `all-packages.nix` frequently causes merge conflicts. It's a point of contention for all new packages
 
 # Detailed design
 [design]: #detailed-design
 
-For all attributes at the root of nixpkgs `pkgs.<name>` which satisfy these criteria:
+Make a large part of `pkgs.<name>` definitions in `all-packages.nix` eligible to be moved to `pkgs/unit/<4-letter name>/<name>`.
+The definition in `all-packages.nix` won't be necessary anymore, as all directories in `pkgs/unit/*/*` are automatically added to the `pkgs` set.
+
+The criteria for `pkgs.<name>` becoming eligible are as follows:
 1. <a id="criteria-1"/> Is defined in `pkgs/top-level/all-packages.nix`
   (necessary so that the overlay containing the automatically discovered packages can be ordered directly before the `all-packages.nix` overlay without changing any behavior)
 2. <a id="criteria-2"/> Is defined to be equal to `pkgs.callPackage <path> { }`
@@ -45,14 +48,15 @@ For all attributes at the root of nixpkgs `pkgs.<name>` which satisfy these crit
 4. <a id="criteria-4"/> Evaluates to a derivation
   (necessary because using `pkg-fun.nix` for a non-package would be counter-intuitive)
 
-These will be become eligible to be transformed as follows:
-- Move the default Nix file from `<path>` to `pkgs/unit/<4-prefix name>/<name>/pkg-fun.nix` ([TODO: Justify why `unit`](https://github.com/nixpkgs-architecture/simple-package-paths/issues/16))
+If all criteria are satisfied, the package becomes eligible for the following changes:
+- Move the default Nix file from `<path>` to `pkgs/unit/<4-prefix name>/<name>/pkg-fun.nix`
   - Where `<4-prefix name>` is the 4-letter prefix of `<name>`, equal to `substring 0 4 name`.
     If `<name>` has less than or exactly 4 characters, `<4-prefix name>` is equal to just `<name>`.
-- Additionally also move all paths transitively referenced by the default Nix file to `pkgs/unit/<4-prefix name>/<name>` [TODO](https://github.com/nixpkgs-architecture/simple-package-paths/issues/19)
+  - The directory `unit` [was chosen](https://github.com/nixpkgs-architecture/simple-package-paths/issues/16) for a future vision where it could be its own top-level directory, not only containing package definitions for software components, but also related NixOS modules, library components, etc.
+- Move all paths transitively referenced by the default Nix file to `pkgs/unit/<4-prefix name>/<name>`
 - Remove the definition of that attribute in `pkgs/top-level/all-packages.nix`
 
-These attributes will newly be added to `pkgs` by automatically calling `pkgs.callPackage pkgs/unit/<4-prefix name>/<name>/pkg-fun.nix { }` on all entries in `pkgs/unit`. In order to make this more efficient, `builtins.readDir` should be optimized as described [here](https://github.com/NixOS/nix/issues/7314).
+These attributes will newly be added to `pkgs` by automatically calling `pkgs.callPackage pkgs/unit/<4-prefix name>/<name>/pkg-fun.nix { }` on all entries in `pkgs/unit`. In order to ensure efficiency of this operation, `builtins.readDir` should be optimized as described [here](https://github.com/NixOS/nix/issues/7314).
 
 ## Transitioning
 
