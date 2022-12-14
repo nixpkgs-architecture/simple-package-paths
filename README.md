@@ -142,6 +142,7 @@ pkgs
     - With an optimized `readDir` this isn't much of a problem
   - Bad because it causes GitHub to limit the rendering of that directory to 1'000 entries (and we have about 10'000 that benefit from this transition for a start)
   - Bad because it makes `git` slower ([TODO: By how much?](https://github.com/nixpkgs-architecture/simple-package-paths/issues/18))
+  - Bad because directory listing slows down with many files
 
 - Don't use `pkg-fun.nix` but another file name:
   - `package.nix`/`pkg.nix`: Makes the migration to a non-function form of overridable packages harder in the future.
