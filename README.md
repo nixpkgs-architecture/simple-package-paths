@@ -11,7 +11,7 @@ related-issues: (will contain links to implementation PRs)
 # Summary
 [summary]: #summary
 
-Make trivial top-level attribute definitions in `pkgs/top-level/all-packages.nix` be auto-generated from a predictable attribute-based file hierarchy.
+Auto-generate trivial top-level attribute definitions in `pkgs/top-level/all-packages.nix`  from a sharded directory that matches the attribute name.
 This makes it much easier to contribute new packages packages, since there's no more guessing needed as to where the package should go, both in the ad-hoc directory categories and in `pkgs/top-level/all-packages.nix`.
 
 
@@ -29,7 +29,7 @@ This makes it much easier to contribute new packages packages, since there's no 
     - On GitHub this is even more problematic, as the `all-packages.nix` file is [too big to be displayed by GitHub](https://github.com/NixOS/nixpkgs/blob/nixos-22.05/pkgs/top-level/all-packages.nix)
   - Then go to that file's definition, which takes quite some time for navigation (unless you have a plugin that can jump to it directly)
     - It also slows down or even deadlocks editors due to the file size
-  - In some cases `nix edit` works, though that's not yet stable (it relies on Flakes being enabled) and comes with some problems ([doesn't yet open a writable file](https://github.com/NixOS/nix/issues/3347), doesn't work with packages that don't set `meta.position` correctly).
+  - `nix edit -f . package-attr` works, though that's not yet stable (it relies on the `nix-command` feature being enabled) and doesn't work with packages that don't set `meta.position` correctly).
 - `all-packages.nix` frequently causes merge conflicts. It's a point of contention for all new packages
 
 # Detailed design
@@ -58,9 +58,9 @@ If all criteria are satisfied, the package becomes eligible for the following ch
 
 These attributes will newly be added to `pkgs` by automatically calling `pkgs.callPackage pkgs/unit/<4-prefix name>/<name>/pkg-fun.nix { }` on all entries in `pkgs/unit`. In order to ensure efficiency of this operation, `builtins.readDir` should be optimized as described [here](https://github.com/NixOS/nix/issues/7314).
 
-## Transitioning
+## Transition
 
-This RFC comes with [a reference tool](https://github.com/nixpkgs-architecture/simple-package-paths/pull/22) to make the above transition in an automated way.
+This RFC comes with [a tool](https://github.com/nixpkgs-architecture/simple-package-paths/pull/22) to make the above transition in an automated way.
 If this RFC is accepted, the result of that tool will be PR'd to nixpkgs.
 The tool itself will also be added to nixpkgs so that it can easily be ran again in the future.
 For at least one release cycle, the legacy way of declaring packages should still be accepted, but the tool can be ran again at any point, thereby moving those new packages from the legacy paths to the new `pkgs/unit` paths.
