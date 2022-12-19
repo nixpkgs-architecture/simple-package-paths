@@ -60,10 +60,10 @@ These attributes will newly be added to `pkgs` by automatically calling `pkgs.ca
 
 ## Transition
 
-This RFC comes with [a tool](https://github.com/nixpkgs-architecture/simple-package-paths/pull/22) to make the above transition in an automated way.
-If this RFC is accepted, the result of that tool will be PR'd to nixpkgs.
-The tool itself will also be added to nixpkgs so that it can easily be ran again in the future.
-For at least one release cycle, the legacy way of declaring packages should still be accepted, but the tool can be ran again at any point, thereby moving those new packages from the legacy paths to the new `pkgs/unit` paths.
+This RFC comes with [a reference tool](https://github.com/nixpkgs-architecture/simple-package-paths/pull/22) to make the above transition in an automated way.
+If this RFC is accepted, the result of that tool will be used to create a pull request to nixpkgs.
+The tool itself will also be added to nixpkgs so that it can easily be run again in the future.
+For at least one release cycle, the legacy way of declaring packages should still be accepted, but the tool can be run again at any point, thereby moving those new packages from the legacy paths to the new `pkgs/unit` paths.
 A CI action may also be implemented to help with this if deemed necessary.
 
 # Examples
@@ -140,13 +140,13 @@ pkgs
   - Good because it's simpler, both for the user and for the code
   - Good because it speeds up Nix evaluation since there's only a single directory to call `builtins.readDir` on instead of many
     - With an optimized `readDir` this isn't much of a problem
-  - Bad because it causes GitHub to limit the rendering of that directory to 1'000 entries (and we have about 10'000 that benefit from this transition for a start)
+  - Bad because the GitHub web interface only renders the first 1'000 entries (and we have about 10'000 that benefit from this transition, even given the restrictions)
   - Bad because it makes `git` slower ([TODO: By how much?](https://github.com/nixpkgs-architecture/simple-package-paths/issues/18))
   - Bad because directory listing slows down with many files
 
 - Don't use `pkg-fun.nix` but another file name:
-  - `package.nix`/`pkg.nix`: Makes the migration to a non-function form of overridable packages harder in the future.
-  - `default.nix`:
+  - `package.nix`/`pkg.nix`: Bad, because it makes the migration to a non-function form of overridable packages harder in the future.
+  - `default.nix`: Bad because:
     - Doesn't have its main benefits in this case:
       - Removing the need to specify the file name in expressions, but this does not apply because this file will be imported automatically by the code that replaces definitions from `all-packages.nix`.
       - Removing the need to specify the file name on the command line, but this does not apply because a package function must be imported into an expression before it can be used, making `nix build -f pkgs/unit/hell/hello` equally broken regardless of file name.
@@ -174,7 +174,7 @@ pkgs
 
 All of these questions are in scope to be addressed in future discussions in the [Nixpkgs Architecture Team](https://nixos.org/community/teams/nixpkgs-architecture.html):
 
-- This RFC only addresses the top-level attribute namespace, aka packages in `pkgs.<name>`, it doesn't do anything about package sets like `pkgs.python3Packages.<name>`, `pkgs.haskell.packages.ghc942.<name>`, which could also benefit from a similar auto-calling
+- This RFC only addresses the top-level attribute namespace, aka packages in `pkgs.<name>`, it doesn't do anything about package sets like `pkgs.python3Packages.<name>`, `pkgs.haskell.packages.ghc942.<name>`, which may or may not also benefit from a similar auto-calling
 - While this RFC doesn't address expressions where the second `callPackage` argument isn't `{}`, there is an easy way to transition to an argument of `{}`: For every attribute of the form `name = attrs.value;` in the argument, make sure `attrs` is in the arguments of the file, then add `name ? attrs.value` to the arguments. Then the expression in `all-packages.nix` can too be auto-called
   - Don't do this for `name = value` pairs though, that's an alias-like thing
 - What to do with different versions, e.g. `wlroots = wlroots_0_14`? This goes into version resolution, a different problem to fix
