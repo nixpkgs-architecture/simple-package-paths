@@ -39,10 +39,10 @@ This RFC establishes the convention of `pkgs/unit/${substring 0 4 name}/${name}`
 The `pkg-fun.nix` files in all unit directories are automatically discovered, called using `pkgs.callPackage` and added to the `pkgs` set.
 
 These requirements will be checked using CI:
-1. <a id="req-1"/> The `pkgs/unit` directory must only contain unit directories, and only in subdirectories of the form `${substring 0 4 name}/${name}`.
-2. <a id="req-2"/> Files outside a unit directory must not reference files inside that unit directory, and the other way around.
-3. <a id="req-3"/> Each unit directory must have a `pkg-fun.nix` file such that `pkgs.callPackage ./pkg-fun.nix {}` evaluates to a derivation.
-4. <a id="req-4"/> Packages defined by unit directories must not be defined or overridden anywhere else, such as in `pkgs/top-level/all-packages.nix`.
+1. The `pkgs/unit` directory must only contain unit directories, and only in subdirectories of the form `${substring 0 4 name}/${name}`.
+2. <a id="req-ref"/> Files outside a unit directory must not reference files inside that unit directory, and the other way around.
+3. Each unit directory must have a `pkg-fun.nix` file such that `pkgs.callPackage ./pkg-fun.nix {}` evaluates to a derivation.
+4. Packages defined by unit directories must not be defined or overridden anywhere else, such as in `pkgs/top-level/all-packages.nix`.
 
 This convention is optional, but it will be applied to all existing packages where possible. Nixpkgs reviewers may encourage contributors to use this convention without enforcing it.
 
@@ -105,35 +105,51 @@ pkgs
 # Alternatives
 [alternatives]: #alternatives
 
-- Use a flat directory `pkgs/unit/*/pkg-fun.nix` instead, arguments:
+## Alternate `pkgs/unit` structure
+
+- Use a flat directory, e.g. `pkgs.hello` would be in `pkgs/unit/hell/hello`.
   - Good because it's simpler, both for the user and for the code
   - Good because it speeds up Nix evaluation since there's only a single directory to call `builtins.readDir` on instead of many
     - With an optimized `readDir` this isn't much of a problem
   - Bad because the GitHub web interface only renders the first 1'000 entries (and we have about 10'000 that benefit from this transition, even given the restrictions)
   - Bad because it makes `git` slower ([TODO: By how much?](https://github.com/nixpkgs-architecture/simple-package-paths/issues/18))
   - Bad because directory listing slows down with many files
+- Use only the 1-, 2- or 3-prefix instead of the 4-prefix name. This was not done because it still leads to directories in `pkgs/unit` containing more than 1'000 entries, leading to the same problems.
+- Use multi-level structure, like a 2-level 2-prefix structure where `hello` is in `pkgs/unit/he/ll/hello`,
+  if packages are less than 4 characters long, we will it out with `-`, e.g. `z` is in `pkgs/unit/z-/--/z`.
+  This is not great because it's more complicated and it would improve git performance only marginally.
+- Use a dynamic structure where directories are rebalanced when they have too many entries.
+  E.g. `pkgs.foobar` could be in `pkgs/unit/f/foobar` initially.
+  But when there's more than 1'000 packages starting with `f`, all packages starting with `f` are distributed under 2-letter prefixes, moving `foobar` to `pkgs/unit/fo/foobar`.
+  This is not great because it's very complex to determine which directory to put a package in, making it bad for contributors.
 
-- Don't use `pkg-fun.nix` but another file name:
-  - `package.nix`/`pkg.nix`: Bad, because it makes the migration to a non-function form of overridable packages harder in the future.
-  - `default.nix`: Bad because:
-    - Doesn't have its main benefits in this case:
-      - Removing the need to specify the file name in expressions, but this does not apply because this file will be imported automatically by the code that replaces definitions from `all-packages.nix`.
-      - Removing the need to specify the file name on the command line, but this does not apply because a package function must be imported into an expression before it can be used, making `nix build -f pkgs/unit/hell/hello` equally broken regardless of file name.
-    - Not using `default.nix` frees up `default.nix` for a short expression that is actually buildable, e.g. `(import ../..).hello`.
-    - Choosing `default.nix` would bias the purpose of the `unit` directory to serve only as package definitions, whereas we could make the tree more human friendly by grouping files together by "topic" rather than by technical delineations.
-      For instance, having a package definition, changelog, package-specific config generator and perhaps even NixOS module in one directory makes work on the package in a broad sense easier.
-      This is not a goal of this RFC, but a motivation to make this a future possibility.
+## Alternate `pkg-fun.nix` filename
+
+- `default.nix`: Bad because:
+  - Doesn't have its main benefits in this case:
+    - Removing the need to specify the file name in expressions, but this does not apply because this file will be imported automatically by the code that replaces definitions from `all-packages.nix`.
+    - Removing the need to specify the file name on the command line, but this does not apply because a package function must be imported into an expression before it can be used, making `nix build -f pkgs/unit/hell/hello` equally broken regardless of file name.
+  - Not using `default.nix` frees up `default.nix` for a short expression that is actually buildable, e.g. `(import ../..).hello`.
+  - Choosing `default.nix` would bias the purpose of the `unit` directory to serve only as package definitions, whereas we could make the tree more human friendly by grouping files together by "topic" rather than by technical delineations.
+    For instance, having a package definition, changelog, package-specific config generator and perhaps even NixOS module in one directory makes work on the package in a broad sense easier.
+    This is not a goal of this RFC, but a motivation to make this a future possibility.
+- `package.nix`/`pkg.nix`: Bad, because it makes the migration to a non-function form of overridable packages harder in the future.
+
+## Alternate `pkgs/unit` location
 
 - Use `unit` (at the nixpkgs root) instead of `pkgs/unit`.
   This is future proof in case we want to make the directory structure more general purpose, but this is out of scope
-- Additionally have a backwards-compatibility layer for moved paths, such as a symlink pointing from the old to the new location, or for Nix files even a `builtins.trace "deprecated" (import ../new/path)`.
-  We are not doing this because it would give precedent to file paths being a stable API interface, which definitely shouldn't be the case (bar some exceptions).
-  It would also lead to worse merge conflicts as the transition is happening, since Git would have to resolve a merge conflict between a symlink and a changed file.
-- Loosen [criteria 3](#user-content-criteria-3), allowing certain packages to be moved to the new structure even if it requires updating references to paths in Nix files.
-  This isn't done because it [turns out](https://github.com/nixpkgs-architecture/simple-package-paths/issues/14) that this criteria indicates the file structure being used as an API interface.
-  By manually refactoring the Nix code to not rely on this anymore, you can increase code quality/reusability/clarity and then do the transition described in the RFC.
-- Use a different sharding scheme than `<4-prefix name>`.
-  Discussions regarding this can be seen [here](https://github.com/nixpkgs-architecture/simple-package-paths/issues/1), [NAT meeting #18](https://github.com/nixpkgs-architecture/meetings/blob/6282b0c6bbc47b6f1becd155586c79728eddefc9/2022-11-21.md) and [here](https://github.com/nixpkgs-architecture/simple-package-paths/pull/20#discussion_r1029004083)
+- Other name proposals were deemed worse: `pkg`, `component`, `part`, `mod`, `comp`
+
+## Filepath backwards-compatibility
+
+Additionally have a backwards-compatibility layer for moved paths, such as a symlink pointing from the old to the new location, or for Nix files even a `builtins.trace "deprecated" (import ../new/path)`.
+- We are not doing this because it would give precedent to file paths being a stable API interface, which definitely shouldn't be the case (bar some exceptions).
+- It would also lead to worse merge conflicts as the transition is happening, since Git would have to resolve a merge conflict between a symlink and a changed file.
+
+## Not having the [reference requirement](#user-content-req-ref)
+
+The reference requirement could be removed, which would allow unit directories to reference files outside themselves, and the other way around. This is not great because it encourages the use of file paths as an API, rather than explicitly exposing functionality from Nix expressions.
 
 # Unresolved questions
 [unresolved]: #unresolved-questions
