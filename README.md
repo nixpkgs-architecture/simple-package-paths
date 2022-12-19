@@ -35,55 +35,25 @@ This makes it much easier to contribute new packages packages, since there's no 
 # Detailed design
 [design]: #detailed-design
 
-Make a large part of `pkgs.<name>` definitions in `all-packages.nix` eligible to be moved to `pkgs/unit/<4-letter name>/<name>`.
-The definition in `all-packages.nix` won't be necessary anymore, as all directories in `pkgs/unit/*/*` are automatically added to the `pkgs` set.
+This RFC establishes the convention of `pkgs/unit/${substring 0 4 name}/${name}` "unit" directories for the definitions of the Nix packages `pkgs.${name}` in nixpkgs.
+The `pkg-fun.nix` files in all unit directories are automatically discovered, called using `pkgs.callPackage` and added to the `pkgs` set.
 
-The criteria for `pkgs.<name>` becoming eligible are as follows:
-1. <a id="criteria-1"/> Is defined in `pkgs/top-level/all-packages.nix`
-  (necessary so that the overlay containing the automatically discovered packages can be ordered directly before the `all-packages.nix` overlay without changing any behavior)
-2. <a id="criteria-2"/> Is defined to be equal to `pkgs.callPackage <path> { }`
-3. <a id="criteria-3"/> All transitively referenced paths from the default Nix file of `<path>` are under the same directory as the default Nix file and can be moved around together without breaking any references in other Nix files (except the one reference in `pkgs/top-level/all-packages.nix`).
-  This means that the Nix code should neither reference code outside, nor be referenced from outside.
-  (This is necessary so that no Nix code needs to be updated in the transition below)
-4. <a id="criteria-4"/> Evaluates to a derivation
-  (necessary because using `pkg-fun.nix` for a non-package would be counter-intuitive)
+These requirements will be checked using CI:
+1. <a id="req-1"/> The `pkgs/unit` directory must only contain unit directories, and only in subdirectories of the form `${substring 0 4 name}/${name}`.
+2. <a id="req-2"/> Files outside a unit directory must not reference files inside that unit directory, and the other way around.
+3. <a id="req-3"/> Each unit directory must have a `pkg-fun.nix` file such that `pkgs.callPackage ./pkg-fun.nix {}` evaluates to a derivation.
+4. <a id="req-4"/> Packages defined by unit directories must not be defined or overridden anywhere else, such as in `pkgs/top-level/all-packages.nix`.
 
-If all criteria are satisfied, the package becomes eligible for the following changes:
-- Move the default Nix file from `<path>` to `pkgs/unit/<4-prefix name>/<name>/pkg-fun.nix`
-  - Where `<4-prefix name>` is the 4-letter prefix of `<name>`, equal to `substring 0 4 name`.
-    If `<name>` has less than or exactly 4 characters, `<4-prefix name>` is equal to just `<name>`.
-  - The directory `unit` [was chosen](https://github.com/nixpkgs-architecture/simple-package-paths/issues/16) for a future vision where it could be its own top-level directory, not only containing package definitions for software components, but also related NixOS modules, library components, etc.
-- Move all paths transitively referenced by the default Nix file to `pkgs/unit/<4-prefix name>/<name>`
-- Remove the definition of that attribute in `pkgs/top-level/all-packages.nix`
+This convention is optional, but it will be applied to all existing packages where possible. Nixpkgs reviewers may encourage contributors to use this convention without enforcing it.
 
-These attributes will newly be added to `pkgs` by automatically calling `pkgs.callPackage pkgs/unit/<4-prefix name>/<name>/pkg-fun.nix { }` on all entries in `pkgs/unit`. In order to ensure efficiency of this operation, `builtins.readDir` should be optimized as described [here](https://github.com/NixOS/nix/issues/7314).
-
-## Transition
-
-This RFC comes with [a reference tool](https://github.com/nixpkgs-architecture/simple-package-paths/pull/22) to make the above transition in an automated way.
-If this RFC is accepted, the result of that tool will be used to create a pull request to nixpkgs.
-The tool itself will also be added to nixpkgs so that it can easily be run again in the future.
-For at least one release cycle, the legacy way of declaring packages should still be accepted, but the tool can be run again at any point, thereby moving those new packages from the legacy paths to the new `pkgs/unit` paths.
-A CI action may also be implemented to help with this if deemed necessary.
-
-# Examples
+## Examples
 [examples]: #examples
 
-- `pkgs.hello` matches all criteria:
-  The default Nix file [`pkgs/applications/misc/hello/default.nix`](https://github.com/NixOS/nixpkgs/blob/nixos-22.05/pkgs/applications/misc/hello/default.nix) only transitively [references `test.nix`](https://github.com/NixOS/nixpkgs/blob/nixos-22.05/pkgs/applications/misc/hello/default.nix#L31) in the same directory.
-  Neither the `default.nix` nor `test.nix` is referenced by any other file in nixpkgs, so we can do the transformation:
-  - Move `pkgs/applications/misc/hello/default.nix` to `pkgs/unit/hell/hello/pkg-fun.nix`
-  - Move `pkgs/applications/misc/hello/test.nix` to `pkgs/unit/hell/hello/test.nix`
-- `pkgs.gnumake` matches all criteria:
-  The default Nix file [`pkgs/development/tools/build-managers/gnumake/default.nix`](https://github.com/NixOS/nixpkgs/blob/nixos-22.05/pkgs/development/tools/build-managers/gnumake/default.nix) transitively references only files in its own directory and no other files in nixpkgs reference `gnumake`'s files, so we can do the transformation by moving all the files from `pkgs/development/tools/build-managers/gnumake` to `pkgs/unit/gnum/gnumake`, the default Nix file ending up in `pkgs/unit/gnum/gnumake/pkg-fun.nix`.
-- Similarly `pkgs.gnumake42` in [`pkgs/development/tools/build-managers/gnumake/4.2/default.nix`](https://github.com/NixOS/nixpkgs/tree/nixos-22.05/pkgs/development/tools/build-managers/gnumake/4.2/default.nix) fulfils all criteria, even though its directory is nested in `pkgs.gnumake`'s directory, they don't reference each others files.
-- `pkgs.zsh` matches all criteria, its default Nix file is moved to `pkgs/unit/zsh/zsh/pkg-fun.nix`
-- `pkgs.emptyFile` doesn't fulfil [criteria 1](#user-content-criteria-1) (it's defined in `pkgs/build-support/trivial-builders.nix`), so it can't be moved into `pkgs/unit`
-- `pkgs.readline` doesn't fulfil [criteria 2](#user-content-criteria-2) (it's defined as an alias to `readline6`, which is itself defined as an alias to `readline63`)
-- `pkgs.readline63` doesn't fulfil [criteria 3](#user-content-criteria-3) (it [transitively references](https://github.com/NixOS/nixpkgs/blob/nixos-22.05/pkgs/development/libraries/readline/6.3.nix#L23) `link-against-ncurses.patch`, which is [also referenced](https://github.com/NixOS/nixpkgs/blob/nixos-22.05/pkgs/development/libraries/readline/7.0.nix#L30) by the definition for `pkgs.readline70`)
-- `pkgs.fetchFromGitHub` doesn't fulfil the [criteria 4](#user-content-criteria-4) (it evaluates to a function), so it can't be moved into `pkgs/unit`
+To add a new package `pkgs.foobar` to nixpkgs, one only needs to create the file `pkgs/unit/foob/foobar/pkg-fun.nix`.
+No need to find an appropriate category nor to modify `pkgs/top-level/all-packages.nix` anymore.
 
-Here's how such a `pkgs/unit` directory structure would look like, note how all attribute names have the same level of nesting:
+With many packages, the `pkgs/unit` directory may look like this:
+
 ```
 pkgs
 └── unit
@@ -118,7 +88,6 @@ pkgs
 [interactions]: #interactions
 
 - `nix edit` is unaffected, since it uses a packages `meta.position` to get the file to edit.
-  Though with this RFC `nix edit` could be updated to not have to rely on that anymore for the packages in the new hierarchy in nixpkgs.
 
 # Drawbacks
 [drawbacks]: #drawbacks
