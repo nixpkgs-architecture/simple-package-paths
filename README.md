@@ -41,8 +41,8 @@ The `pkg-fun.nix` files in all unit directories are automatically discovered, ca
 These requirements will be checked using CI:
 1. The `pkgs/unit` directory must only contain unit directories, and only in subdirectories of the form `${substring 0 4 name}/${name}`.
 2. <a id="req-ref"/> Files outside a unit directory must not reference files inside that unit directory, and the other way around.
-3. Each unit directory must have a `pkg-fun.nix` file such that `pkgs.callPackage ./pkg-fun.nix {}` evaluates to a derivation.
-4. Packages defined by unit directories must not be defined or overridden anywhere else, such as in `pkgs/top-level/all-packages.nix`.
+4. The definition of a package in the unit directory is the one `pkgs.<name>` points to.
+5. To avoid problems with merges, if a package attribute is defined by a unit directory, it must not be defined in `pkgs/top-level/all-packages.nix` or `pkgs/top-level/aliases.nix`.
 
 This convention is optional, but it will be applied to all existing packages where possible. Nixpkgs reviewers may encourage contributors to use this convention without enforcing it.
 
@@ -150,6 +150,16 @@ Additionally have a backwards-compatibility layer for moved paths, such as a sym
 ## Not having the [reference requirement](#user-content-req-ref)
 
 The reference requirement could be removed, which would allow unit directories to reference files outside themselves, and the other way around. This is not great because it encourages the use of file paths as an API, rather than explicitly exposing functionality from Nix expressions.
+
+## Relax design to try to attack issues like "package variants" up front
+
+An issue with restrictions like the above one is that they don't work well for when we package a number of variants of package, e.g. different versions of the same package that share some infra. We do presume we would have to have *some* notion of "private details shared between multiple units" or "multiple entry points to unit" to handle these cases.
+
+We've chosen to explicitly ignore these tough cases, and emphasize uniform structure of units over being able to migrate over as many packages as possible from the get go. The rationale for this decision is basically:
+
+1. It is (a bit) easier to relax requirements later than tighten them later.
+2. We plan on incrementally migrating Nixpkgs to this new system anyways, for caution's sake, so starting with fewer units is not only fine but *good*.
+3. Explicitly marking use-cases out of scope allows us to have a more focused and thorough investigation of the use-cases that remain, to build a solid foundation.
 
 # Unresolved questions
 [unresolved]: #unresolved-questions
