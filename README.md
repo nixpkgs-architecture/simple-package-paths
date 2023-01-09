@@ -36,7 +36,15 @@ This makes it much easier to contribute new packages packages, since there's no 
 [design]: #detailed-design
 
 This RFC establishes the convention of `pkgs/unit/${substring 0 4 name}/${name}` "unit" directories for the definitions of the Nix packages `pkgs.${name}` in nixpkgs.
-The `pkg-fun.nix` files in all unit directories are automatically discovered, called using `pkgs.callPackage` and added to the `pkgs` set.
+All unit directories must contain a `pkg-fun.nix` file, and they may contain an `args.nix` file.
+Unit directories are automatically discovered and transformed to a definition of the form
+```
+# If args.nix doesn't exist
+pkgs.${name} = pkgs.callPackage ${unitDir}/pkg-fun.nix {}
+
+# If args.nix does exists
+pkgs.${name} = pkgs.callPackage ${unitDir}/pkg-fun.nix (import ${unitDir}/args.nix pkgs);
+```
 
 These requirements will be checked using CI:
 1. The `pkgs/unit` directory must only contain unit directories, and only in subdirectories of the form `${substring 0 4 name}/${name}`.
@@ -160,6 +168,25 @@ We've chosen to explicitly ignore these tough cases, and emphasize uniform struc
 1. It is (a bit) easier to relax requirements later than tighten them later.
 2. We plan on incrementally migrating Nixpkgs to this new system anyways, for caution's sake, so starting with fewer units is not only fine but *good*.
 3. Explicitly marking use-cases out of scope allows us to have a more focused and thorough investigation of the use-cases that remain, to build a solid foundation.
+
+## Not allowing `args.nix` to influence `callPackage` arguments
+
+Some packages have a need for customized `callPackage` arguments, especially for having package variants as dependencies. An example is depending on `python3`:
+
+```nix
+foo = pkgs.callPackage ./foo {
+  python = python3;
+}
+```
+
+> **Note**
+> While it's possible to use `python3` in the package function, this breaks third-party code doing `.override { python = ...; }`:
+>
+> ```nix
+> { python3 }: python3.buildPythonPackage { ... }
+> ```
+
+If the unit directories didn't allow customization of the `callPackage` arguments, packages already using the unit directories would have to switch back to `all-packages.nix` to add such customizations.
 
 # Unresolved questions
 [unresolved]: #unresolved-questions
