@@ -40,7 +40,8 @@ The `pkg-fun.nix` files in all unit directories are automatically discovered, ca
 
 These requirements will be checked using CI:
 1. The `pkgs/unit` directory must only contain unit directories, and only in subdirectories of the form `${substring 0 4 name}/${name}`.
-2. <a id="req-ref"/> Files outside a unit directory must not reference files inside that unit directory, and the other way around.
+2. <a id="req-ref-out"/> Files inside a unit directory must not reference files outside that unit directory.
+3. <a id="req-ref-in"/> Files outside a unit directory must not reference files inside a unit directory, except for definitions of variant attributes¹ in `all-packages.nix` and the auto-calling logic.
 4. The definition of a package in the unit directory is the one `pkgs.<name>` points to.
 5. To avoid problems with merges, if a package attribute is defined by a unit directory, it must not be defined in `pkgs/top-level/all-packages.nix` or `pkgs/top-level/aliases.nix`.
 
@@ -151,15 +152,23 @@ Additionally have a backwards-compatibility layer for moved paths, such as a sym
 
 The reference requirement could be removed, which would allow unit directories to reference files outside themselves, and the other way around. This is not great because it encourages the use of file paths as an API, rather than explicitly exposing functionality from Nix expressions.
 
-## Relax design to try to attack issues like "package variants" up front
+## Restrict design to try delay issues like "package variants"
 
-An issue with restrictions like the above one is that they don't work well for when we package a number of variants of package, e.g. different versions of the same package that share some infra. We do presume we would have to have *some* notion of "private details shared between multiple units" or "multiple entry points to unit" to handle these cases.
+We perceived some uncertainty around [package variants](#def-package-variant) that led us to scope these out at first, but we did not identify a real problem that would arise from allowing non-auto-called attributes to reference `pkgs/unit` files. However, imposing unnecessary restrictions would be counterproductive because:
 
-We've chosen to explicitly ignore these tough cases, and emphasize uniform structure of units over being able to migrate over as many packages as possible from the get go. The rationale for this decision is basically:
+ - The contributor experience would suffer, because it won't be obvious to everyone whether their package is allowed to go into `pkgs/unit`. This means that we'd fail to solve the goal "Which directory should my package definition go in?", leading to unnecessary requests for changes in pull requests.
 
-1. It is (a bit) easier to relax requirements later than tighten them later.
-2. We plan on incrementally migrating Nixpkgs to this new system anyways, for caution's sake, so starting with fewer units is not only fine but *good*.
-3. Explicitly marking use-cases out of scope allows us to have a more focused and thorough investigation of the use-cases that remain, to build a solid foundation.
+ - When lifting the restriction, the reviewers have to adapt, again leading to unnecessary requests for changes in pull requests.
+ 
+ - We'd be protracting the migration by unnecessary gatekeeping or discovering some problem late.
+
+That said, we did identify risks:
+
+ - We might get something wrong, and while we plan to incrementally migrate Nixpkgs to this new system anyway, starting with fewer units is good.
+ 
+ - We might not focus enough on the foundation, while we could more easily relax requirements later.
+
+However, after more discussions and experimentation, we feel confident to allow package variants to reference unit directories.
 
 # Unresolved questions
 [unresolved]: #unresolved-questions
@@ -176,3 +185,10 @@ All of these questions are in scope to be addressed in future discussions in the
 - What to do about e.g. `libsForQt5.callPackage`? This goes into overrides, a different problem to fix
 - What about aliases like `jami-daemon = jami.jami-daemon`?
 - What about `recurseIntoAttrs`? Not single packages, package sets, another problem
+
+# Definitions
+
+ - <a id="def-variant-attribute"/> *variant attribute*: an attribute that defines a package by invoking it with non-default arguments, for example:
+   ```
+     cairo_headless = cairo.override(o: { withGUI = false; });
+   ```
