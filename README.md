@@ -190,5 +190,5 @@ All of these questions are in scope to be addressed in future discussions in the
 
  - <a id="def-variant-attribute"/> *variant attribute*: an attribute that defines a package by invoking it with non-default arguments, for example:
    ```
-     cairo_headless = cairo.override(o: { withGUI = false; });
+     graphviz_nox = callPackage ../tools/graphics/graphviz { withXorg = false; };
    ```
