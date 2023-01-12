@@ -107,7 +107,7 @@ pkgs
 
 ## Alternate `pkgs/unit` structure
 
-- Use a flat directory, e.g. `pkgs.hello` would be in `pkgs/unit/hell/hello`.
+- Use a flat directory, e.g. `pkgs.hello` would be in `pkgs/unit/hello`.
   - Good because it's simpler, both for the user and for the code
   - Good because it speeds up Nix evaluation since there's only a single directory to call `builtins.readDir` on instead of many
     - With an optimized `readDir` this isn't much of a problem
