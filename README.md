@@ -41,7 +41,7 @@ The `pkg-fun.nix` files in all unit directories are automatically discovered, ca
 These requirements will be checked using CI:
 1. The `pkgs/unit` directory must only contain unit directories, and only in subdirectories of the form `${substring 0 4 name}/${name}`.
 2. <a id="req-ref-out"/> Files inside a unit directory must not reference files outside that unit directory.
-3. <a id="req-ref-in"/> Files outside a unit directory must not reference files inside a unit directory, except for definitions of variant attributes¹ in `all-packages.nix` and the auto-calling logic.
+3. <a id="req-ref-in"/> Files outside a unit directory must not reference files inside a unit directory, except for definitions of attributes in `all-packages.nix` and the auto-calling logic.
 4. The definition of a package in the unit directory is the one `pkgs.<name>` points to.
 5. To avoid problems with merges, if a package attribute is defined by a unit directory, an attribute of the same name in `pkgs/top-level/all-packages.nix` (or `pkgs/top-level/aliases.nix`) must not redefine it in terms of something other than the unit.
 
@@ -158,6 +158,8 @@ We perceived some uncertainty around [package variants](#def-package-variant) th
 
  - The contributor experience would suffer, because it won't be obvious to everyone whether their package is allowed to go into `pkgs/unit`. This means that we'd fail to solve the goal "Which directory should my package definition go in?", leading to unnecessary requests for changes in pull requests.
 
+ - Changes in dependencies can require dependents to add an override, causing packages to be moved back and forth between unit directories and the general `pkgs` tree, worsening the problem as people have to decide categories *again*.
+
  - When lifting the restriction, the reviewers have to adapt, again leading to unnecessary requests for changes in pull requests.
  
  - We'd be protracting the migration by unnecessary gatekeeping or discovering some problem late.
@@ -165,10 +167,17 @@ We perceived some uncertainty around [package variants](#def-package-variant) th
 That said, we did identify risks:
 
  - We might get something wrong, and while we plan to incrementally migrate Nixpkgs to this new system anyway, starting with fewer units is good.
+    - Mitigation: only automate the renames of simple (`callPackage path { }`) calls, to keep the initial change small
  
  - We might not focus enough on the foundation, while we could more easily relax requirements later.
+    - After more discussion, we feel confident that the manual `callPackage` calls are unlikely to cause issues that we wouldn't otherwise have.
 
-However, after more discussions and experimentation, we feel confident to allow package variants to reference unit directories.
+# Recommend a `callPackage` pattern with default arguments
+
+> - While this RFC doesn't address expressions where the second `callPackage` argument isn't `{}`, there is an easy way to transition to an argument of `{}`: For every attribute of the form `name = attrs.value;` in the argument, make sure `attrs` is in the arguments of the file, then add `name ? attrs.value` to the arguments. Then the expression in `all-packages.nix` can too be auto-called
+>   - Don't do this for `name = value` pairs though, that's an alias-like thing
+
+`callPackage` does not favor the default argument when both a default argument and a value in `pkgs` exist. Changing the semantics of `callPackage` is out of scope.
 
 # Allow `callPackage` arguments to be specified in `<unit>/args.nix`
 
@@ -200,8 +209,7 @@ Con:
 All of these questions are in scope to be addressed in future discussions in the [Nixpkgs Architecture Team](https://nixos.org/community/teams/nixpkgs-architecture.html):
 
 - This RFC only addresses the top-level attribute namespace, aka packages in `pkgs.<name>`, it doesn't do anything about package sets like `pkgs.python3Packages.<name>`, `pkgs.haskell.packages.ghc942.<name>`, which may or may not also benefit from a similar auto-calling
-- While this RFC doesn't address expressions where the second `callPackage` argument isn't `{}`, there is an easy way to transition to an argument of `{}`: For every attribute of the form `name = attrs.value;` in the argument, make sure `attrs` is in the arguments of the file, then add `name ? attrs.value` to the arguments. Then the expression in `all-packages.nix` can too be auto-called
-  - Don't do this for `name = value` pairs though, that's an alias-like thing
+- Improve the semantics of `callPackage` and/or apply a better solution, such as a module-like solution
 - What to do with different versions, e.g. `wlroots = wlroots_0_14`? This goes into version resolution, a different problem to fix
 - What to do about e.g. `libsForQt5.callPackage`? This goes into overrides, a different problem to fix
 - What about aliases like `jami-daemon = jami.jami-daemon`?
