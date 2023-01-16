@@ -43,7 +43,7 @@ These requirements will be checked using CI:
 2. <a id="req-ref-out"/> Files inside a unit directory must not reference files outside that unit directory.
 3. <a id="req-ref-in"/> Files outside a unit directory must not reference files inside a unit directory, except for definitions of variant attributes¹ in `all-packages.nix` and the auto-calling logic.
 4. The definition of a package in the unit directory is the one `pkgs.<name>` points to.
-5. To avoid problems with merges, if a package attribute is defined by a unit directory, it must not be defined in `pkgs/top-level/all-packages.nix` or `pkgs/top-level/aliases.nix`.
+5. To avoid problems with merges, if a package attribute is defined by a unit directory, an attribute of the same name in `pkgs/top-level/all-packages.nix` (or `pkgs/top-level/aliases.nix`) must not redefine it in terms of something other than the unit.
 
 This convention is optional, but it will be applied to all existing packages where possible. Nixpkgs reviewers may encourage contributors to use this convention without enforcing it.
 
@@ -152,7 +152,7 @@ Additionally have a backwards-compatibility layer for moved paths, such as a sym
 
 The reference requirement could be removed, which would allow unit directories to reference files outside themselves, and the other way around. This is not great because it encourages the use of file paths as an API, rather than explicitly exposing functionality from Nix expressions.
 
-## Restrict design to try delay issues like "package variants"
+## Restrict design to try delay issues like "package variants" {#no-variants}
 
 We perceived some uncertainty around [package variants](#def-package-variant) that led us to scope these out at first, but we did not identify a real problem that would arise from allowing non-auto-called attributes to reference `pkgs/unit` files. However, imposing unnecessary restrictions would be counterproductive because:
 
@@ -169,6 +169,27 @@ That said, we did identify risks:
  - We might not focus enough on the foundation, while we could more easily relax requirements later.
 
 However, after more discussions and experimentation, we feel confident to allow package variants to reference unit directories.
+
+# Allow `callPackage` arguments to be specified in `<unit>/args.nix`
+
+The idea was to expand the auto-calling logic according to:
+
+Unit directories are automatically discovered and transformed to a definition of the form
+```
+# If args.nix doesn't exist
+pkgs.${name} = pkgs.callPackage ${unitDir}/pkg-fun.nix {}
+# If args.nix does exists
+pkgs.${name} = pkgs.callPackage ${unitDir}/pkg-fun.nix (import ${unitDir}/args.nix pkgs);
+```
+
+Pro:
+ - It makes another class of packages uniform, by picking a solution with restricted expressive power.
+
+Con:
+ - It does not solve the contributor experience problem of having to many rules.
+ - `args.nix` is another pattern that contributors need to learn how to use, as we have seen that it is not immediately obvious to everyone how it works.
+ - A CI check can mitigate the possible lack of uniformity, and we see a simple implementation strategy for it.
+ - This keeps the contents of the unit directories simple and a bit more uniform than with optional `args.nix` files.
 
 # Unresolved questions
 [unresolved]: #unresolved-questions
