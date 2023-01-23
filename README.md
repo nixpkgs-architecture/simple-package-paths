@@ -40,9 +40,10 @@ The `pkg-fun.nix` files in all unit directories are automatically discovered, ca
 
 These requirements will be checked using CI:
 1. The `pkgs/unit` directory must only contain unit directories, and only in subdirectories of the form `${substring 0 4 name}/${name}`.
-2. <a id="req-ref"/> Files outside a unit directory must not reference files inside that unit directory, and the other way around.
+2. <a id="req-ref-out"/> Files inside a unit directory must not reference files outside that unit directory.
+3. <a id="req-ref-in"/> Files outside a unit directory must not reference files inside a unit directory, except for definitions of attributes in `all-packages.nix` and the auto-calling logic.
 4. The definition of a package in the unit directory is the one `pkgs.<name>` points to.
-5. To avoid problems with merges, if a package attribute is defined by a unit directory, it must not be defined in `pkgs/top-level/all-packages.nix` or `pkgs/top-level/aliases.nix`.
+5. To avoid problems with merges, if a package attribute is defined by a unit directory, an attribute of the same name in `pkgs/top-level/all-packages.nix` (or `pkgs/top-level/aliases.nix`) must not redefine it in terms of something other than the unit.
 
 This convention is optional, but it will be applied to all existing packages where possible. Nixpkgs reviewers may encourage contributors to use this convention without enforcing it.
 
@@ -151,15 +152,53 @@ Additionally have a backwards-compatibility layer for moved paths, such as a sym
 
 The reference requirement could be removed, which would allow unit directories to reference files outside themselves, and the other way around. This is not great because it encourages the use of file paths as an API, rather than explicitly exposing functionality from Nix expressions.
 
-## Relax design to try to attack issues like "package variants" up front
+## Restrict design to try delay issues like "package variants" {#no-variants}
 
-An issue with restrictions like the above one is that they don't work well for when we package a number of variants of package, e.g. different versions of the same package that share some infra. We do presume we would have to have *some* notion of "private details shared between multiple units" or "multiple entry points to unit" to handle these cases.
+We perceived some uncertainty around [package variants](#def-package-variant) that led us to scope these out at first, but we did not identify a real problem that would arise from allowing non-auto-called attributes to reference `pkgs/unit` files. However, imposing unnecessary restrictions would be counterproductive because:
 
-We've chosen to explicitly ignore these tough cases, and emphasize uniform structure of units over being able to migrate over as many packages as possible from the get go. The rationale for this decision is basically:
+ - The contributor experience would suffer, because it won't be obvious to everyone whether their package is allowed to go into `pkgs/unit`. This means that we'd fail to solve the goal "Which directory should my package definition go in?", leading to unnecessary requests for changes in pull requests.
 
-1. It is (a bit) easier to relax requirements later than tighten them later.
-2. We plan on incrementally migrating Nixpkgs to this new system anyways, for caution's sake, so starting with fewer units is not only fine but *good*.
-3. Explicitly marking use-cases out of scope allows us to have a more focused and thorough investigation of the use-cases that remain, to build a solid foundation.
+ - Changes in dependencies can require dependents to add an override, causing packages to be moved back and forth between unit directories and the general `pkgs` tree, worsening the problem as people have to decide categories *again*.
+
+ - When lifting the restriction, the reviewers have to adapt, again leading to unnecessary requests for changes in pull requests.
+ 
+ - We'd be protracting the migration by unnecessary gatekeeping or discovering some problem late.
+
+That said, we did identify risks:
+
+ - We might get something wrong, and while we plan to incrementally migrate Nixpkgs to this new system anyway, starting with fewer units is good.
+    - Mitigation: only automate the renames of simple (`callPackage path { }`) calls, to keep the initial change small
+ 
+ - We might not focus enough on the foundation, while we could more easily relax requirements later.
+    - After more discussion, we feel confident that the manual `callPackage` calls are unlikely to cause issues that we wouldn't otherwise have.
+
+# Recommend a `callPackage` pattern with default arguments
+
+> - While this RFC doesn't address expressions where the second `callPackage` argument isn't `{}`, there is an easy way to transition to an argument of `{}`: For every attribute of the form `name = attrs.value;` in the argument, make sure `attrs` is in the arguments of the file, then add `name ? attrs.value` to the arguments. Then the expression in `all-packages.nix` can too be auto-called
+>   - Don't do this for `name = value` pairs though, that's an alias-like thing
+
+`callPackage` does not favor the default argument when both a default argument and a value in `pkgs` exist. Changing the semantics of `callPackage` is out of scope.
+
+# Allow `callPackage` arguments to be specified in `<unit>/args.nix`
+
+The idea was to expand the auto-calling logic according to:
+
+Unit directories are automatically discovered and transformed to a definition of the form
+```
+# If args.nix doesn't exist
+pkgs.${name} = pkgs.callPackage ${unitDir}/pkg-fun.nix {}
+# If args.nix does exists
+pkgs.${name} = pkgs.callPackage ${unitDir}/pkg-fun.nix (import ${unitDir}/args.nix pkgs);
+```
+
+Pro:
+ - It makes another class of packages uniform, by picking a solution with restricted expressive power.
+
+Con:
+ - It does not solve the contributor experience problem of having to many rules.
+ - `args.nix` is another pattern that contributors need to learn how to use, as we have seen that it is not immediately obvious to everyone how it works.
+ - A CI check can mitigate the possible lack of uniformity, and we see a simple implementation strategy for it.
+ - This keeps the contents of the unit directories simple and a bit more uniform than with optional `args.nix` files.
 
 # Unresolved questions
 [unresolved]: #unresolved-questions
@@ -170,9 +209,15 @@ We've chosen to explicitly ignore these tough cases, and emphasize uniform struc
 All of these questions are in scope to be addressed in future discussions in the [Nixpkgs Architecture Team](https://nixos.org/community/teams/nixpkgs-architecture.html):
 
 - This RFC only addresses the top-level attribute namespace, aka packages in `pkgs.<name>`, it doesn't do anything about package sets like `pkgs.python3Packages.<name>`, `pkgs.haskell.packages.ghc942.<name>`, which may or may not also benefit from a similar auto-calling
-- While this RFC doesn't address expressions where the second `callPackage` argument isn't `{}`, there is an easy way to transition to an argument of `{}`: For every attribute of the form `name = attrs.value;` in the argument, make sure `attrs` is in the arguments of the file, then add `name ? attrs.value` to the arguments. Then the expression in `all-packages.nix` can too be auto-called
-  - Don't do this for `name = value` pairs though, that's an alias-like thing
+- Improve the semantics of `callPackage` and/or apply a better solution, such as a module-like solution
 - What to do with different versions, e.g. `wlroots = wlroots_0_14`? This goes into version resolution, a different problem to fix
 - What to do about e.g. `libsForQt5.callPackage`? This goes into overrides, a different problem to fix
 - What about aliases like `jami-daemon = jami.jami-daemon`?
 - What about `recurseIntoAttrs`? Not single packages, package sets, another problem
+
+# Definitions
+
+ - <a id="def-variant-attribute"/> *variant attribute*: an attribute that defines a package by invoking it with non-default arguments, for example:
+   ```
+     graphviz_nox = callPackage ../tools/graphics/graphviz { withXorg = false; };
+   ```
