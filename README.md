@@ -90,6 +90,12 @@ pkgs
 
 - `nix edit` and search.nixos.org are unaffected, since they rely on `meta.position` to get the file to edit, which still works
 - `git blame` locally and on GitHub is unaffected, since it follows file renames properly.
+- A commonly recommended way of building package directories in nixpkgs is to use `nix-build -E 'with import <nixpkgs> {}; callPackage pkgs/applications/misc/hello {}'`.
+  Since the path changes `pkg-fun.nix` is now used, this becomes like `nix-build -E 'with import <nixpkgs> {}; callPackage pkgs/unit/he/hello/pkg-fun.nix {}'`, which is harder for users.
+  However, calling a path like this is an anti-pattern anyways, because it doesn't use the correct nixpkgs version and it doesn't use the correct argument overrides.
+  The correct way of doing it was to add the package to `pkgs/top-level/all-packages.nix`, then calling `nix-build -A hello`.
+  This `nix-build -E` workaround is partially motivated by the difficulty of knowing the mapping from attributes to package paths, which is what this RFC improves upon.
+  By teaching users that `pkgs/unit/*/<name>` corresponds to `nix-build -A <name>`, the need for such `nix-build -E` workarounds should disappear.
 
 # Drawbacks
 [drawbacks]: #drawbacks
