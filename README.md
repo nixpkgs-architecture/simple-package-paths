@@ -100,8 +100,8 @@ pkgs
     - Many packages fit multiple categories, leading to multiple locations to search through instead of one
   - There's other better ways of discovering similar packages, e.g. [Repology](https://repology.org/)
 - This breaks `builtins.unsafeGetAttrPos "hello" pkgs`. Counter-arguments:
-  - This functionality is unsafe and therefore breakages can be expected
-  - Support for this can be added to Nix (make `builtins.readDir` propagate file as a position)
+  - This functionality is impure and therefore the result can't be assumed to stay the same over time
+  - Support for this could be added to Nix (make `builtins.readDir` propagate file as a position)
 
 # Alternatives
 [alternatives]: #alternatives
