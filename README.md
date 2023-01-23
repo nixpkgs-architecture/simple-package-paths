@@ -89,6 +89,7 @@ pkgs
 [interactions]: #interactions
 
 - `nix edit` and search.nixos.org are unaffected, since they rely on `meta.position` to get the file to edit, which still works
+- `git blame` locally and on GitHub is unaffected, since it follows file renames properly.
 
 # Drawbacks
 [drawbacks]: #drawbacks
