@@ -88,7 +88,7 @@ pkgs
 # Interactions
 [interactions]: #interactions
 
-- `nix edit` is unaffected, since it uses a packages `meta.position` to get the file to edit.
+- `nix edit` and search.nixos.org is unaffected, since they rely on `meta.position` to get the file to edit, which still works
 
 # Drawbacks
 [drawbacks]: #drawbacks
