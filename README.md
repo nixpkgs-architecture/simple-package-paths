@@ -35,7 +35,7 @@ This makes it much easier to contribute new packages packages, since there's no 
 # Detailed design
 [design]: #detailed-design
 
-This RFC establishes the convention of `pkgs/unit/${substring 0 4 name}/${name}` "unit" directories for the definitions of the Nix packages `pkgs.${name}` in nixpkgs.
+This RFC establishes the convention of `pkgs/unit/${toLower (substring 0 4 name)}/${name}` "unit" directories for the definitions of the Nix packages `pkgs.${name}` in nixpkgs.
 The `pkg-fun.nix` files in all unit directories are automatically discovered, called using `pkgs.callPackage` and added to the `pkgs` set.
 
 These requirements will be checked using CI:
