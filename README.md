@@ -37,16 +37,42 @@ This makes it much easier to contribute new packages packages, since there's no 
 This RFC establishes the standard of using `pkgs/unit/${shard}/${name}` "unit" directories for the definitions of the Nix packages `pkgs.${name}` in nixpkgs, where `shard = toLower (substring 0 2 name)`.
 All unit directories are automatically discovered and incorporated into the `pkgs` set using `pkgs.${name} = pkgs.callPackage pkgs/unit/${shard}/${name}/pkg-fun.nix { }`.
 
-These requirements will be checked by CI:
-1. Structure: The `pkgs/unit` directory must only contain unit directories, and only in subdirectories of the form `${shard}/${name}`.
-  Each unit directory must contain at least a `pkg-fun.nix` file, but may contain arbitrary other files and directories.
-2. Semantics: Calling `pkgs.callPackage pkgs/unit/${shard}/${name}/pkg-fun.nix {}` must return a derivation that can be built directly with `nix-build`.
-3. Context-freedom: Files inside a unit directory must not reference files outside that unit directory, and the other way around.
-  The only exception is the next requirement.
-4. Custom arguments: If `pkgs/top-level/all-packages.nix` contains a definition for the attribute `${name}` and the unit directory `pkgs/unit/${shard}/${name}` exists, then the attribute value must be defined as `pkgs.callPackage pkgs/unit/${shard}/${name}/pkg-fun.nix args`, where `args` may be freely chosen.
-
 This standard must be followed for newly added packages.
-A treewide migration to this standard will be performed for all existing packages that can satisfy the requirements.
+The following requirements will be checked by CI.
+A treewide migration to this standard will be performed for existing packages that can satisfy these requirements.
+
+## Structure
+
+The `pkgs/unit` directory must only contain unit directories, and only in subdirectories of the form `${shard}/${name}`.
+Each unit directory must contain at least a `pkg-fun.nix` file, but may contain arbitrary other files and directories.
+
+This ensures that maintainers don't have to verify this structure manually, which is prone to mistakes.
+
+## Only derivations
+
+If `pkgs/unit/${shard}/${name}` exists, `pkgs.${name}` must be a derivation that can be built directly with `nix-build`.
+
+This ensures that people can expect the unit directories to correspond to buildable packages and not functions like `pkgs.fetchFromGitHub` or `pkgs.buildRustCrate`.
+
+## Stable boundary
+
+Unit directories may only interact with the rest of nixpkgs via the stable `pkgs.${name}` attributes, not with file references:
+- Files inside a unit directory must not reference files outside that unit directory.
+  Therefore all dependencies on other packages must come from `pkg-fun.nix` arguments injected by `callPackage`.
+  This ensures that files in nixpkgs can be moved around without breaking this package.
+- Files outside a unit directory must not reference files inside that unit directory.
+  Therefore other packages can only depend on this package via `pkgs.${name}`.
+  This ensures that files within unit directories (except `pkg-fun.nix`) can be freely moved and changed without breaking any other packages.
+
+The only exceptions to this rule are:
+- The `pkg-fun.nix` file, which will be referenced by the code that imports it as `pkgs.${name}`
+- The `pkgs/top-level/all-packages.nix` file which may reference the `pkg-fun.nix` file according to the next requirement
+
+## Custom arguments
+
+If `pkgs/top-level/all-packages.nix` contains a definition for the attribute `${name}` and the unit directory `pkgs/unit/${shard}/${name}` exists, then the attribute value must be defined as `pkgs.callPackage pkgs/unit/${shard}/${name}/pkg-fun.nix args`, where `args` may be freely chosen.
+
+This ensures that even if a package initially doesn't require a custom `args`, if it later does, it doesn't have to be moved out of the `pkgs/unit` directory to pass custom arguments.
 
 ## Examples
 [examples]: #examples
