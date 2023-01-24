@@ -88,7 +88,7 @@ pkgs
 # Interactions
 [interactions]: #interactions
 
-- `nix edit` and search.nixos.org is unaffected, since they rely on `meta.position` to get the file to edit, which still works
+- `nix edit` and search.nixos.org are unaffected, since they rely on `meta.position` to get the file to edit, which still works
 
 # Drawbacks
 [drawbacks]: #drawbacks
@@ -100,7 +100,7 @@ pkgs
     - Many packages fit multiple categories, leading to multiple locations to search through instead of one
   - There's other better ways of discovering similar packages, e.g. [Repology](https://repology.org/)
 - This breaks `builtins.unsafeGetAttrPos "hello" pkgs`. Counter-arguments:
-  - This functionality is impure and therefore the result can't be assumed to stay the same over time
+  - We have to draw a line as to what constitutes the public interface of Nixpkgs. We have decided that making attribute position information part of that is not productive. For context, this information is already accepted to be unreliable at the language level, noting the `unsafe` part of the name.
   - Support for this could be added to Nix (make `builtins.readDir` propagate file as a position)
 
 # Alternatives
