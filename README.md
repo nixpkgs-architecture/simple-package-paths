@@ -89,6 +89,13 @@ pkgs
 [interactions]: #interactions
 
 - `nix edit` and search.nixos.org are unaffected, since they rely on `meta.position` to get the file to edit, which still works
+- `git blame` locally and on GitHub is unaffected, since it follows file renames properly.
+- A commonly recommended way of building package directories in nixpkgs is to use `nix-build -E 'with import <nixpkgs> {}; callPackage pkgs/applications/misc/hello {}'`.
+  Since the path changes `pkg-fun.nix` is now used, this becomes like `nix-build -E 'with import <nixpkgs> {}; callPackage pkgs/unit/he/hello/pkg-fun.nix {}'`, which is harder for users.
+  However, calling a path like this is an anti-pattern anyways, because it doesn't use the correct nixpkgs version and it doesn't use the correct argument overrides.
+  The correct way of doing it was to add the package to `pkgs/top-level/all-packages.nix`, then calling `nix-build -A hello`.
+  This `nix-build -E` workaround is partially motivated by the difficulty of knowing the mapping from attributes to package paths, which is what this RFC improves upon.
+  By teaching users that `pkgs/unit/*/<name>` corresponds to `nix-build -A <name>`, the need for such `nix-build -E` workarounds should disappear.
 
 # Drawbacks
 [drawbacks]: #drawbacks
@@ -130,10 +137,7 @@ pkgs
   - Doesn't have its main benefits in this case:
     - Removing the need to specify the file name in expressions, but this does not apply because this file will be imported automatically by the code that replaces definitions from `all-packages.nix`.
     - Removing the need to specify the file name on the command line, but this does not apply because a package function must be imported into an expression before it can be used, making `nix build -f pkgs/unit/hell/hello` equally broken regardless of file name.
-  - Not using `default.nix` frees up `default.nix` for a short expression that is actually buildable, e.g. `(import ../..).hello`.
-  - Choosing `default.nix` would bias the purpose of the `unit` directory to serve only as package definitions, whereas we could make the tree more human friendly by grouping files together by "topic" rather than by technical delineations.
-    For instance, having a package definition, changelog, package-specific config generator and perhaps even NixOS module in one directory makes work on the package in a broad sense easier.
-    This is not a goal of this RFC, but a motivation to make this a future possibility.
+  - Not using `default.nix` frees up `default.nix` for a short expression that is actually buildable, e.g. `(import ../..).hello`, although at that point it might better be auto-generated or implicit in the CLI
 - `package.nix`/`pkg.nix`: Bad, because it makes the migration to a non-function form of overridable packages harder in the future.
 
 ## Alternate `pkgs/unit` location
@@ -208,6 +212,8 @@ Con:
 
 All of these questions are in scope to be addressed in future discussions in the [Nixpkgs Architecture Team](https://nixos.org/community/teams/nixpkgs-architecture.html):
 
+- Making the filetree more human-friendly by grouping files together by "topic" rather than technical delineations.
+  For instance, having a package definition, changelog, package-specific config generator and perhaps even NixOS module in one directory makes work on the package in a broad sense easier.
 - This RFC only addresses the top-level attribute namespace, aka packages in `pkgs.<name>`, it doesn't do anything about package sets like `pkgs.python3Packages.<name>`, `pkgs.haskell.packages.ghc942.<name>`, which may or may not also benefit from a similar auto-calling
 - Improve the semantics of `callPackage` and/or apply a better solution, such as a module-like solution
 - What to do with different versions, e.g. `wlroots = wlroots_0_14`? This goes into version resolution, a different problem to fix
