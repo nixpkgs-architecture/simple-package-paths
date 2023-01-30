@@ -37,8 +37,8 @@ This makes it much easier to contribute new packages packages, since there's no 
 This RFC establishes the standard of using `pkgs/unit/${shard}/${name}` "unit" directories for the definitions of the Nix packages `pkgs.${name}` in nixpkgs, where `shard = toLower (substring 0 2 name)`.
 All unit directories are automatically discovered and incorporated into the `pkgs` set using `pkgs.${name} = pkgs.callPackage pkgs/unit/${shard}/${name}/pkg-fun.nix { }`.
 
-This standard must be followed for newly added packages.
 The following requirements will be checked by CI.
+This standard must be followed for newly added packages that can satisfy these requirements.
 A treewide migration to this standard will be performed for existing packages that can satisfy these requirements.
 
 ## Structure
@@ -64,13 +64,11 @@ Unit directories may only interact with the rest of nixpkgs via the stable `pkgs
   Therefore other packages can only depend on this package via `pkgs.${name}`.
   This ensures that files within unit directories (except `pkg-fun.nix`) can be freely moved and changed without breaking any other packages.
 
-The only exceptions to this rule are:
-- The `pkg-fun.nix` file, which will be referenced by the code that imports it as `pkgs.${name}`
-- The `pkgs/top-level/all-packages.nix` file which may reference the `pkg-fun.nix` file according to the next requirement
+The only notable exception to this rule is the `pkgs/top-level/all-packages.nix` file which may reference the `pkg-fun.nix` file according to the next requirement.
 
 ## Custom arguments
 
-If `pkgs/top-level/all-packages.nix` contains a definition for the attribute `${name}` and the unit directory `pkgs/unit/${shard}/${name}` exists, then the attribute value must be defined as `pkgs.callPackage pkgs/unit/${shard}/${name}/pkg-fun.nix args`, where `args` may be freely chosen.
+If `pkgs/top-level/all-packages.nix` contains a definition for the attribute `${name}` and the unit directory `pkgs/unit/${shard}/${name}` exists, then the attribute value must be defined as `pkgs.callPackage pkgs/unit/${shard}/${name}/pkg-fun.nix args`, where `args` may be a freely chosen expression.
 
 This ensures that even if a package initially doesn't require a custom `args`, if it later does, it doesn't have to be moved out of the `pkgs/unit` directory to pass custom arguments.
 
