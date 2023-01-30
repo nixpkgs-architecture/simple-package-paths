@@ -8,6 +8,9 @@ shepherd-leader: (name to be appointed by RFC steering committee)
 related-issues: https://github.com/NixOS/nixpkgs/pull/211832
 ---
 
+> **Warning**
+> This RFC draft is being discussed as [RFC 140](https://github.com/NixOS/rfcs/pull/140), please give feedback in that PR instead of this repository.
+
 # Summary
 [summary]: #summary
 
