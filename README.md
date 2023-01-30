@@ -5,15 +5,14 @@ author: Silvan Mosberger
 co-authors: Nixpkgs Architecture Team
 shepherd-team: (names, to be nominated and accepted by RFC steering committee)
 shepherd-leader: (name to be appointed by RFC steering committee)
-related-issues: (will contain links to implementation PRs)
+related-issues: https://github.com/NixOS/nixpkgs/pull/211832
 ---
 
 # Summary
 [summary]: #summary
 
-Auto-generate trivial top-level attribute definitions in `pkgs/top-level/all-packages.nix`  from a sharded directory that matches the attribute name.
+Auto-generate trivial top-level attribute definitions in `pkgs/top-level/all-packages.nix` from a directory structure that matches the attribute name.
 This makes it much easier to contribute new packages packages, since there's no more guessing needed as to where the package should go, both in the ad-hoc directory categories and in `pkgs/top-level/all-packages.nix`.
-
 
 # Motivation
 [motivation]: #motivation
@@ -35,22 +34,48 @@ This makes it much easier to contribute new packages packages, since there's no 
 # Detailed design
 [design]: #detailed-design
 
-This RFC establishes the convention of `pkgs/unit/${toLower (substring 0 4 name)}/${name}` "unit" directories for the definitions of the Nix packages `pkgs.${name}` in nixpkgs.
-The `pkg-fun.nix` files in all unit directories are automatically discovered, called using `pkgs.callPackage` and added to the `pkgs` set.
+This RFC establishes the standard of using `pkgs/unit/${shard}/${name}` "unit" directories for the definitions of the Nix packages `pkgs.${name}` in nixpkgs, where `shard = toLower (substring 0 2 name)`.
+All unit directories are automatically discovered and incorporated into the `pkgs` set using `pkgs.${name} = pkgs.callPackage pkgs/unit/${shard}/${name}/pkg-fun.nix { }`.
 
-These requirements will be checked using CI:
-1. The `pkgs/unit` directory must only contain unit directories, and only in subdirectories of the form `${substring 0 4 name}/${name}`.
-2. <a id="req-ref-out"/> Files inside a unit directory must not reference files outside that unit directory.
-3. <a id="req-ref-in"/> Files outside a unit directory must not reference files inside a unit directory, except for definitions of attributes in `all-packages.nix` and the auto-calling logic.
-4. The definition of a package in the unit directory is the one `pkgs.<name>` points to.
-5. To avoid problems with merges, if a package attribute is defined by a unit directory, an attribute of the same name in `pkgs/top-level/all-packages.nix` (or `pkgs/top-level/aliases.nix`) must not redefine it in terms of something other than the unit.
+The following requirements will be checked by CI.
+This standard must be followed for newly added packages that can satisfy these requirements.
+A treewide migration to this standard will be performed for existing packages that can satisfy these requirements.
 
-This convention is optional, but it will be applied to all existing packages where possible. Nixpkgs reviewers may encourage contributors to use this convention without enforcing it.
+## Structure
+
+The `pkgs/unit` directory must only contain unit directories, and only in subdirectories of the form `${shard}/${name}`.
+Each unit directory must contain at least a `pkg-fun.nix` file, but may contain arbitrary other files and directories.
+
+This ensures that maintainers don't have to verify this structure manually, which is prone to mistakes.
+
+## Only derivations
+
+If `pkgs/unit/${shard}/${name}` exists, `pkgs.${name}` must be a derivation that can be built directly with `nix-build`.
+
+This ensures that people can expect the unit directories to correspond to buildable packages and not functions like `pkgs.fetchFromGitHub` or `pkgs.buildRustCrate`.
+
+## Stable boundary
+
+Unit directories may only interact with the rest of nixpkgs via the stable `pkgs.${name}` attributes, not with file references:
+- Files inside a unit directory must not reference files outside that unit directory.
+  Therefore all dependencies on other packages must come from `pkg-fun.nix` arguments injected by `callPackage`.
+  This ensures that files in nixpkgs can be moved around without breaking this package.
+- Files outside a unit directory must not reference files inside that unit directory.
+  Therefore other packages can only depend on this package via `pkgs.${name}`.
+  This ensures that files within unit directories (except `pkg-fun.nix`) can be freely moved and changed without breaking any other packages.
+
+The only notable exception to this rule is the `pkgs/top-level/all-packages.nix` file which may reference the `pkg-fun.nix` file according to the next requirement.
+
+## Custom arguments
+
+If `pkgs/top-level/all-packages.nix` contains a definition for the attribute `${name}` and the unit directory `pkgs/unit/${shard}/${name}` exists, then the attribute value must be defined as `pkgs.callPackage pkgs/unit/${shard}/${name}/pkg-fun.nix args`, where `args` may be a freely chosen expression.
+
+This ensures that even if a package initially doesn't require a custom `args`, if it later does, it doesn't have to be moved out of the `pkgs/unit` directory to pass custom arguments.
 
 ## Examples
 [examples]: #examples
 
-To add a new package `pkgs.foobar` to nixpkgs, one only needs to create the file `pkgs/unit/foob/foobar/pkg-fun.nix`.
+To add a new package `pkgs.foobar` to nixpkgs, one only needs to create the file `pkgs/unit/fo/foobar/pkg-fun.nix`.
 No need to find an appropriate category nor to modify `pkgs/top-level/all-packages.nix` anymore.
 
 With many packages, the `pkgs/unit` directory may look like this:
@@ -58,31 +83,19 @@ With many packages, the `pkgs/unit` directory may look like this:
 ```
 pkgs
 └── unit
-   ├── acpi
-   │  ├── acpi
-   │  ├── acpica-tools
-   │  ├── acpid
+   ├── _0
+   │  ├── _0verkill
+   │  └── _0x
+   ┊
+   ├── ch
+   │  ├── ChowPhaser
+   │  ├── CHOWTapeModel
+   │  ├── chroma
    │  ┊
    ┊
-   ├── auto
-   │  ├── autossh
-   │  ├── automirror
-   │  ├── autosuspend
-   │  ┊
+   ├── t
+   │  └── t
    ┊
-   ├── sl
-   │  └── sl
-   ┊
-   ├── slac
-   │  ├── slack
-   │  ├── slack-cli
-   │  └── slack-term
-   ┊
-   ├── zsh
-   │  ├── zsh
-   │  ├── zsh-autocomplete
-   │  ├── zsh-completions
-   ┊  ┊
 ```
 
 # Interactions
@@ -122,7 +135,7 @@ pkgs
   - Bad because the GitHub web interface only renders the first 1'000 entries (and we have about 10'000 that benefit from this transition, even given the restrictions)
   - Bad because it makes `git` slower ([TODO: By how much?](https://github.com/nixpkgs-architecture/simple-package-paths/issues/18))
   - Bad because directory listing slows down with many files
-- Use only the 1-, 2- or 3-prefix instead of the 4-prefix name. This was not done because it still leads to directories in `pkgs/unit` containing more than 1'000 entries, leading to the same problems.
+- Use `substring 0 3 name` or `substring 0 4 name`. This was not done because it still leads to directories in `pkgs/unit` containing more than 1'000 entries, leading to the same problems.
 - Use multi-level structure, like a 2-level 2-prefix structure where `hello` is in `pkgs/unit/he/ll/hello`,
   if packages are less than 4 characters long, we will it out with `-`, e.g. `z` is in `pkgs/unit/z-/--/z`.
   This is not great because it's more complicated and it would improve git performance only marginally.
